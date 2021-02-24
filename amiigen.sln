@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30011.22
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "amiigen", "amiigen\amiigen.csproj", "{59BBDFDA-280C-4E87-B053-E984A4582A92}"
+	ProjectSection(ProjectDependencies) = postProject
+		{764B3CAF-0D4C-4CE5-BB95-B5696795FBB5} = {764B3CAF-0D4C-4CE5-BB95-B5696795FBB5}
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "libamiibo", "libamiibo\libamiibo\libamiibo.csproj", "{764B3CAF-0D4C-4CE5-BB95-B5696795FBB5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{59BBDFDA-280C-4E87-B053-E984A4582A92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{59BBDFDA-280C-4E87-B053-E984A4582A92}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{59BBDFDA-280C-4E87-B053-E984A4582A92}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{59BBDFDA-280C-4E87-B053-E984A4582A92}.Release|Any CPU.Build.0 = Release|Any CPU
+		{764B3CAF-0D4C-4CE5-BB95-B5696795FBB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{764B3CAF-0D4C-4CE5-BB95-B5696795FBB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{764B3CAF-0D4C-4CE5-BB95-B5696795FBB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{764B3CAF-0D4C-4CE5-BB95-B5696795FBB5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {165513F0-0BDB-458C-93A9-83409DA9C8C8}
+	EndGlobalSection
+EndGlobal
