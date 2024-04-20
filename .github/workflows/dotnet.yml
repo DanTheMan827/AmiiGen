@@ -3,6 +3,8 @@ name: .NET
 on:
   workflow_dispatch:
   push:
+    tags:
+      - "v*"
     branches: '*'
   pull_request:
     branches: '*'
@@ -17,24 +19,40 @@ jobs:
       uses: actions/checkout@v2
       with:
         submodules: true
-    
+
+    # get version from pushed tag
+    - name: Extract version
+      if: startsWith(github.ref, 'refs/tags/v')
+      id: version
+      run: |
+        echo "TAG=${GITHUB_REF#refs/tags/}" >> ${GITHUB_OUTPUT}
+        echo "VERSION=${GITHUB_REF#refs/tags/v}" >> ${GITHUB_OUTPUT}
+
     - name: Restore dependencies
       run: dotnet restore
-      
+
     - name: setup-msbuild
       uses: microsoft/setup-msbuild@v1
-    
-    - name: Git Config
-      run: git config --global user.email "git@example.com" && git config --global user.name "Builder"
-    
-    - name: Patch
-      run: cd libamiibo && git am ../0001-Don-t-use-appsettings.json.patch
-    
+
     - name: Build
       run: msbuild amiigen.sln
-    
+
     - name: Publish build artifacts
       uses: actions/upload-artifact@v2.2.2
       with:
         name: amiigen-debug
         path: amiigen\bin\Debug\net461
+
+    # if we had a tag, we should make a release
+    - name: Upload release artifacts
+      if: startsWith(github.ref, 'refs/tags/v')
+      id: upload_file_release
+      uses: softprops/action-gh-release@v0.1.15
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        draft: false
+        generate_release_notes: true
+        files: |
+          ./amiigen/bin/Debug/net461/amiigen.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -9,40 +9,16 @@ using System.Text.Json.Serialization;
 
 namespace AmiiGen
 {
+    /// <summary>
+    /// Main program to generate Amiibo tags.
+    /// </summary>
     class Program
     {
-        static readonly byte[] tagHeader = new byte[] { 0x04, 0x01, 0x02, 0x8F, 0x03, 0x04, 0x05, 0x06, 0x04, 0x48, 0x0f, 0xe0, 0xf1, 0x10, 0xff, 0xee, 0xa5, 0x00, 0x00, 0x00 };
-        static readonly byte[] tagFooter = new byte[] { 0x01, 0x00, 0x0F, 0xBD, 0x00, 0x00, 0x00, 0x04, 0x5F, 0x00, 0x00, 0x00 };
-
-        static byte[] GetRandomBytes(int count)
-        {
-            var output = new byte[count];
-            var rnd = new Random();
-
-            rnd.NextBytes(output); 
-
-            return output;
-        }
-        
-        static byte[] GenerateBin(params byte[] identificationBlock)
-        {
-            if (identificationBlock.Length != 8)
-            {
-                throw new ArgumentException("Invalid identification block length");
-            }
-
-            var decrypted = new byte[540];
-
-            tagHeader.CopyTo(decrypted, 0);
-            identificationBlock.CopyTo(decrypted, 84);
-            GetRandomBytes(32).CopyTo(decrypted, 96);
-            tagFooter.CopyTo(decrypted, 520);
-
-            var tag = AmiiboTag.FromNtagData(decrypted);
-
-            return tag.EncryptWithKeys().Take(540).ToArray();
-        }
-
+        /// <summary>
+        /// Downloads JSON data from the specified URL.
+        /// </summary>
+        /// <param name="url">The URL to download JSON from.</param>
+        /// <returns>An instance of AmiiboDatabaseModel.</returns>
         static AmiiboDatabaseModel DownloadJson(string url = "https://raw.githubusercontent.com/N3evin/AmiiboAPI/master/database/amiibo.json")
         {
             using (var wc = new WebClient())
@@ -53,9 +29,15 @@ namespace AmiiGen
             }
         }
 
+        /// <summary>
+        /// Cleans a filename by replacing invalid characters.
+        /// </summary>
+        /// <param name="input">The input filename.</param>
+        /// <param name="replacement">The character to replace invalid characters with.</param>
+        /// <returns>The cleaned filename.</returns>
         static string CleanFilename(string input, char replacement = '_')
         {
-            foreach (char c in System.IO.Path.GetInvalidFileNameChars())
+            foreach (char c in Path.GetInvalidFileNameChars().Concat(Path.GetInvalidPathChars()))
             {
                 input = input.Replace(c, '_');
             }
@@ -63,66 +45,102 @@ namespace AmiiGen
             return input;
         }
 
-        public static byte[] StringToByteArray(string hex)
-        {
-            return Enumerable.Range(0, hex.Length)
-                             .Where(x => x % 2 == 0)
-                             .Select(x => Convert.ToByte(hex.Substring(x, 2), 16))
-                             .ToArray();
-        }
-
+        /// <summary>
+        /// Main method.
+        /// </summary>
+        /// <param name="args">Command line arguments.</param>
         static void Main(string[] args)
         {
             if (File.Exists("key_retail.bin"))
             {
+                // Set the Amiibo keys file
+                LibAmiibo.Settings.AmiiboKeys = "key_retail.bin";
+
+                // Download the Amiibo JSON data
                 var json = DownloadJson();
+
+                // Process each Amiibo entry
                 foreach (var amiibo in json.Amiibos)
                 {
                     var amiiboId = amiibo.Key;
                     var seriesName = json.AmiiboSeries[$"0x{amiiboId.Substring(14, 2)}"];
                     var destPath = Path.Combine("dumps", CleanFilename(seriesName));
                     var destFile = Path.Combine(destPath, CleanFilename($"{json.Amiibos[amiiboId].Name} ({amiiboId}).bin"));
-                    var identificationBlock = StringToByteArray(amiiboId.Substring(2));
 
+                    // Log to the console
                     Console.WriteLine(destFile);
 
+                    // Create directory if it doesn't exist
                     Directory.CreateDirectory(destPath);
-                    File.WriteAllBytes(destFile, GenerateBin(identificationBlock));
+
+                    // Generate and write Amiibo tag
+                    var tag = AmiiboTag.FromIdentificationBlock(amiiboId);
+                    var encryptedTag = tag.EncryptWithKeys();
+                    File.WriteAllBytes(destFile, encryptedTag);
                 }
             }
             else
             {
+                // Inform user that keys file is missing
                 Console.WriteLine("key_retail.bin not found");
             }
 
+            // Wait for user input before exiting
             Console.WriteLine("\nPress enter to exit");
             Console.ReadLine();
         }
     }
 
+    /// <summary>
+    /// Represents the model for the Amiibo database.
+    /// </summary>
     class AmiiboDatabaseModel
     {
+        /// <summary>
+        /// Represents an Amiibo entry.
+        /// </summary>
         public class Amiibo
         {
+            /// <summary>
+            /// Gets or sets the name of the Amiibo.
+            /// </summary>
             [JsonPropertyName("name")]
             public string Name { get; set; }
 
+            /// <summary>
+            /// Gets or sets the release information of the Amiibo.
+            /// </summary>
             [JsonPropertyName("release")]
             public Dictionary<string, string> Release { get; set; }
         }
 
+        /// <summary>
+        /// Gets or sets the dictionary of Amiibo series.
+        /// </summary>
         [JsonPropertyName("amiibo_series")]
         public Dictionary<string, string> AmiiboSeries { get; set; }
 
+        /// <summary>
+        /// Gets or sets the dictionary of Amiibos.
+        /// </summary>
         [JsonPropertyName("amiibos")]
         public Dictionary<string, Amiibo> Amiibos { get; set; }
 
+        /// <summary>
+        /// Gets or sets the dictionary of characters.
+        /// </summary>
         [JsonPropertyName("characters")]
         public Dictionary<string, string> Characters { get; set; }
 
+        /// <summary>
+        /// Gets or sets the dictionary of game series.
+        /// </summary>
         [JsonPropertyName("game_series")]
         public Dictionary<string, string> GameSeries { get; set; }
 
+        /// <summary>
+        /// Gets or sets the dictionary of types.
+        /// </summary>
         [JsonPropertyName("types")]
         public Dictionary<string, string> Types { get; set; }
     }
