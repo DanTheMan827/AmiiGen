@@ -28,11 +28,11 @@ jobs:
         echo "TAG=${GITHUB_REF#refs/tags/}" >> ${GITHUB_OUTPUT}
         echo "VERSION=${GITHUB_REF#refs/tags/v}" >> ${GITHUB_OUTPUT}
 
-    - name: Restore dependencies
-      run: dotnet restore
-
     - name: setup-msbuild
       uses: microsoft/setup-msbuild@v1
+
+    - name: Restore dependencies
+      run: msbuild -t:restore
 
     - name: Build
       run: msbuild amiigen.sln
