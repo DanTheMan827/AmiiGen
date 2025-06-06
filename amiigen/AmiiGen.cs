@@ -1,11 +1,10 @@
-﻿using LibAmiibo.Data;
+﻿using CommandLine;
+using LibAmiibo.Data;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace AmiiGen
 {
@@ -45,103 +44,95 @@ namespace AmiiGen
             return input;
         }
 
+        static void Exit(int exitCode, bool wait = true)
+        {
+            if (wait)
+            {
+                // Wait for user input before exiting
+                Console.WriteLine("\nPress enter to exit");
+                Console.ReadLine();
+            }
+
+            // Exit the application with the specified exit code
+            Environment.Exit(exitCode);
+        }
+
         /// <summary>
         /// Main method.
         /// </summary>
         /// <param name="args">Command line arguments.</param>
         static void Main(string[] args)
         {
-            if (File.Exists("key_retail.bin"))
-            {
-                // Set the Amiibo keys file
-                LibAmiibo.Settings.AmiiboKeys = "key_retail.bin";
-
-                // Download the Amiibo JSON data
-                var json = DownloadJson();
-
-                // Process each Amiibo entry
-                foreach (var amiibo in json.Amiibos)
+            var parsed = Parser.Default.ParseArguments<CommandLineOptions>(args);
+            parsed.WithParsed(options =>
                 {
-                    var amiiboId = amiibo.Key;
-                    var seriesName = json.AmiiboSeries[$"0x{amiiboId.Substring(14, 2)}"];
-                    var destPath = Path.Combine("dumps", CleanFilename(seriesName));
-                    var destFile = Path.Combine(destPath, CleanFilename($"{json.Amiibos[amiiboId].Name} ({amiiboId}).bin"));
+                    if (string.IsNullOrWhiteSpace(options.KeyFile) || !File.Exists(options.KeyFile))
+                    {
+                        Console.WriteLine($"Key file '{options.KeyFile}' does not exist. Please provide a valid key file.");
+                        Exit(1, options.WaitForExit);
+                    }
 
-                    // Log to the console
-                    Console.WriteLine(destFile);
+                    // Set the Amiibo keys file
+                    LibAmiibo.Settings.AmiiboKeys = options.KeyFile;
 
-                    // Create directory if it doesn't exist
-                    Directory.CreateDirectory(destPath);
+                    if ((options.CharacterId != null && options.AllCharacters))
+                    {
+                        Console.WriteLine("Please specify either a character ID with --single or use --all to generate dumps for all characters, but not both.");
+                        Exit(1, options.WaitForExit);
+                    }
 
-                    // Generate and write Amiibo tag
-                    var tag = AmiiboTag.FromIdentificationBlock(amiiboId);
-                    var encryptedTag = tag.EncryptWithKeys();
-                    File.WriteAllBytes(destFile, encryptedTag);
-                }
-            }
-            else
-            {
-                // Inform user that keys file is missing
-                Console.WriteLine("key_retail.bin not found");
-            }
+                    if (options.CharacterId == null && !options.AllCharacters)
+                    {
+                        Console.WriteLine("No mode specified, defaulting to --all.");
+                        options.AllCharacters = true;
+                    }
 
-            // Wait for user input before exiting
-            Console.WriteLine("\nPress enter to exit");
-            Console.ReadLine();
+                    if (options.AllCharacters)
+                    {
+                        Console.WriteLine("Generating dumps for all characters...");
+
+                        // Download the Amiibo JSON data
+                        var json = DownloadJson(options.DatabaseUrl.ToString());
+
+                        // Process each Amiibo entry
+                        foreach (var amiibo in json.Amiibos)
+                        {
+                            var amiiboId = amiibo.Key;
+                            var seriesName = json.AmiiboSeries[$"0x{amiiboId.Substring(14, 2)}"];
+                            var destPath = Path.Combine(string.IsNullOrWhiteSpace(options.OutputPath) ? "dumps" : options.OutputPath, CleanFilename(seriesName));
+                            var destFile = Path.Combine(destPath, CleanFilename($"{json.Amiibos[amiiboId].Name} ({amiiboId}).bin"));
+
+                            // Create directory if it doesn't exist
+                            Directory.CreateDirectory(destPath);
+
+                            // Generate and write Amiibo tag
+                            var tag = AmiiboTag.FromIdentificationBlock(amiiboId);
+                            var encryptedTag = tag.EncryptWithKeys();
+
+                            // Write the encrypted tag
+                            Console.WriteLine($"Writing: {Path.GetFullPath(destFile)}");
+                            File.WriteAllBytes(destFile, encryptedTag);
+                        }
+                    }
+
+                    if (options.CharacterId != null)
+                    {
+                        Console.WriteLine($"Generating dump for character ID: {options.CharacterId}...");
+
+                        // Generate and write Amiibo tag
+                        var tag = AmiiboTag.FromIdentificationBlock(options.CharacterId.ToString());
+                        var encryptedTag = tag.EncryptWithKeys();
+
+                        // Determine the destination path based on the output option
+                        var destPath = new FileInfo(string.IsNullOrWhiteSpace(options.OutputPath) ? $"{options.CharacterId.ToString()}.bin" : options.OutputPath);
+
+                        // Write the encrypted tag to the specified output path
+                        Console.WriteLine($"Writing: {destPath.FullName}");
+                        File.WriteAllBytes(destPath.FullName, encryptedTag);
+                    }
+
+                    Exit(0, options.WaitForExit);
+                });
         }
-    }
-
-    /// <summary>
-    /// Represents the model for the Amiibo database.
-    /// </summary>
-    class AmiiboDatabaseModel
-    {
-        /// <summary>
-        /// Represents an Amiibo entry.
-        /// </summary>
-        public class Amiibo
-        {
-            /// <summary>
-            /// Gets or sets the name of the Amiibo.
-            /// </summary>
-            [JsonPropertyName("name")]
-            public string Name { get; set; }
-
-            /// <summary>
-            /// Gets or sets the release information of the Amiibo.
-            /// </summary>
-            [JsonPropertyName("release")]
-            public Dictionary<string, string> Release { get; set; }
-        }
-
-        /// <summary>
-        /// Gets or sets the dictionary of Amiibo series.
-        /// </summary>
-        [JsonPropertyName("amiibo_series")]
-        public Dictionary<string, string> AmiiboSeries { get; set; }
-
-        /// <summary>
-        /// Gets or sets the dictionary of Amiibos.
-        /// </summary>
-        [JsonPropertyName("amiibos")]
-        public Dictionary<string, Amiibo> Amiibos { get; set; }
-
-        /// <summary>
-        /// Gets or sets the dictionary of characters.
-        /// </summary>
-        [JsonPropertyName("characters")]
-        public Dictionary<string, string> Characters { get; set; }
-
-        /// <summary>
-        /// Gets or sets the dictionary of game series.
-        /// </summary>
-        [JsonPropertyName("game_series")]
-        public Dictionary<string, string> GameSeries { get; set; }
-
-        /// <summary>
-        /// Gets or sets the dictionary of types.
-        /// </summary>
-        [JsonPropertyName("types")]
-        public Dictionary<string, string> Types { get; set; }
     }
 }
